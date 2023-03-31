@@ -47,15 +47,21 @@ world = {};
 //XXX: TODO Make this prettier!
 function drawCircle(context,entity) {
     with(context) {
-        beginPath();                
-        lineWidth = 3;
+        lineWidth = 5;
         var x = entity["x"];
         var y = entity["y"];
         //moveTo(x,y);
         fillStyle = entity["colour"];
         strokeStyle = fillStyle;
+        shadowColor = "rgb(250,250,250)";
+        shadowBlur = 0;
+        shadowOffsetX = 1;
+        shadowOffsetY = 1;
+        beginPath();              
+
         arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
-        stroke();                                
+        stroke();   
+        fill();    
     }
 }
 
@@ -125,6 +131,9 @@ function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just modified!
+    let content = {};
+    content[entity] = data;
+    socket.send(JSON.stringify(content))
 }
 var counter = 0;
 function addEntityWithoutName(data) {
@@ -228,18 +237,24 @@ mouse = (function() {
     return self;
 })();
 
+function randomColor() {
+    randColor = Math.floor(Math.random()*16777215).toString(16);
+    color = "#" + randColor
+    return color;
+}
+
 // Add the application specific mouse listeners!
 //XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
+    addEntityWithoutName({'x':x,'y':y,'colour':randomColor()});
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntityWithoutName({'x':x,'y':y,'colour':randomColor()});
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
+    addEntityWithoutName({'x':x,'y':y,'colour':randomColor(),
                           'radius':10});
 });
 
@@ -252,8 +267,17 @@ function update() {
 function wsSetup() {
     var url = "ws://"+host+"/subscribe";   
     socket = new WebSocket(url);
-    socket.onopen = function() {
+    socket.onopen = async function() {
         //XXX: TODO What are you going to do here?
+        try {
+            const response = await fetch('/world');
+            const jsonData = await response.json();
+            world = jsonData;
+            drawNextFrame();
+            drawFrame();
+        } catch (error) {
+            console.error(error);
+        }
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
@@ -261,7 +285,12 @@ function wsSetup() {
     socket.onmessage = function(msg) {  
         try {
             debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here?            
+            //XXX: TODO What are you going to do here? 
+            let data = JSON.parse(msg.data)
+            for (let i in data) {
+                world[i] = data[i]
+            }         
+            drawNextFrame();
         } catch (e) {
             alert("socket on message: " + e);
         }
